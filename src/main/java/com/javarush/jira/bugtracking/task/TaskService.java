@@ -10,6 +10,7 @@ import com.javarush.jira.bugtracking.task.mapper.TaskFullMapper;
 import com.javarush.jira.bugtracking.task.to.TaskToExt;
 import com.javarush.jira.bugtracking.task.to.TaskToFull;
 import com.javarush.jira.common.error.DataConflictException;
+import com.javarush.jira.common.error.IllegalRequestDataException;
 import com.javarush.jira.common.error.NotFoundException;
 import com.javarush.jira.common.util.Util;
 import com.javarush.jira.login.AuthUser;
@@ -20,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.javarush.jira.bugtracking.ObjectType.TASK;
 import static com.javarush.jira.bugtracking.task.TaskUtil.fillExtraFields;
@@ -130,6 +133,20 @@ public class TaskService {
                 .orElseThrow(() -> new NotFoundException(String
                         .format("Not found assignment with userType=%s for task {%d} for user {%d}", userType, id, userId)));
         assignment.setEndpoint(LocalDateTime.now());
+    }
+
+    @Transactional
+    public void addTags(long taskId, Set<String> tags) {
+        Assert.notEmpty(tags, "tags must not be empty");
+        for (String tag : tags) {
+            if (tag == null || tag.isBlank() || tag.length() < 2 || tag.length() > 32) {
+                throw new IllegalRequestDataException("Tag length must be between 2 and 32 characters");
+            }
+        }
+        Task task = handler.getRepository().getExisted(taskId);
+        Set<String> taskTags = new HashSet<>(task.getTags());
+        taskTags.addAll(tags);
+        task.setTags(taskTags);
     }
 
     private void checkAssignmentActionPossible(long id, String userType, boolean assign) {

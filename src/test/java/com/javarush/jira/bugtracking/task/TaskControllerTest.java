@@ -12,6 +12,8 @@ import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import java.util.Set;
+
 import static com.javarush.jira.bugtracking.ObjectType.TASK;
 import static com.javarush.jira.bugtracking.task.TaskController.REST_URL;
 import static com.javarush.jira.bugtracking.task.TaskService.CANNOT_ASSIGN;
@@ -32,6 +34,8 @@ class TaskControllerTest extends AbstractControllerTest {
     private static final String ACTIVITIES_REST_URL = REST_URL + "/activities";
     private static final String ACTIVITIES_REST_URL_SLASH = REST_URL + "/activities/";
     private static final String CHANGE_STATUS = "/change-status";
+    private static final String TAGS = "/tags";
+
 
     private static final String PROJECT_ID = "projectId";
     private static final String SPRINT_ID = "sprintId";
@@ -589,5 +593,60 @@ class TaskControllerTest extends AbstractControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail", is(String
                         .format("Not found assignment with userType=%s for task {%d} for user {%d}", TASK_DEVELOPER, TASK1_ID, ADMIN_ID))));
+    }
+
+    @Test
+    @WithUserDetails(value = USER_MAIL)
+    void addTags() throws Exception {
+        perform(MockMvcRequestBuilders.patch(TASKS_REST_URL_SLASH + TASK1_ID + TAGS)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(writeValue(TaskTestData.TAGS)))
+                .andDo(print())
+                .andExpect(status().isNoContent());
+
+        TaskToFull expected = new TaskToFull(taskToFull1.getId(), taskToFull1.getCode(), taskToFull1.getTitle(),
+                taskToFull1.getDescription(), taskToFull1.getTypeCode(), taskToFull1.getStatusCode(),
+                taskToFull1.getPriorityCode(), taskToFull1.getUpdated(), taskToFull1.getEstimate(),
+                taskToFull1.getParent(), taskToFull1.getProject(), taskToFull1.getSprint(),
+                taskToFull1.getActivityTos(), TaskTestData.TAGS);
+        get(TASK1_ID, expected);
+    }
+
+    @Test
+    @WithUserDetails(value = USER_MAIL)
+    void addEmptyTags() throws Exception {
+        perform(MockMvcRequestBuilders.patch(TASKS_REST_URL_SLASH + TASK1_ID + TAGS)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(writeValue(Set.of())))
+                .andDo(print())
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @WithUserDetails(value = USER_MAIL)
+    void addInvalidTag() throws Exception {
+        perform(MockMvcRequestBuilders.patch(TASKS_REST_URL_SLASH + TASK1_ID + TAGS)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(writeValue(Set.of("a"))))
+                .andDo(print())
+                .andExpect(status().isUnprocessableEntity()); 
+    }
+
+    @Test
+    @WithUserDetails(value = USER_MAIL)
+    void addTagsWhenTaskNotFound() throws Exception {
+        perform(MockMvcRequestBuilders.patch(TASKS_REST_URL_SLASH + NOT_FOUND + TAGS)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(writeValue(Set.of("backend"))))
+                .andDo(print())
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void addTagsUnauthorized() throws Exception {
+        perform(MockMvcRequestBuilders.patch(TASKS_REST_URL_SLASH + TASK1_ID + TAGS)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(writeValue(Set.of("backend"))))
+                .andExpect(status().isUnauthorized());
     }
 }
